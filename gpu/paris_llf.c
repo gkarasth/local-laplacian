@@ -120,9 +120,10 @@ void SetConvolutionSize_local(int width, int height , int Gaussianwidth) {
   szLocalWorkSize1_Conv2D_local[0]  = (width+2*2);
   szLocalWorkSize1_Conv2D_local[1]  = 1;
 
-  szGlobalWorkSize2_Conv2D_local[0] = (width+2*2)*Gaussianwidth;
-  szGlobalWorkSize2_Conv2D_local[1] = height;
-  szLocalWorkSize2_Conv2D_local[0]  = (width+2*2);
+
+  szGlobalWorkSize2_Conv2D_local[0] = (height+2*2)*Gaussianwidth;
+  szGlobalWorkSize2_Conv2D_local[1] = width;
+  szLocalWorkSize2_Conv2D_local[0]  = (height+2*2);
   szLocalWorkSize2_Conv2D_local[1]  = 1;
 }
 
@@ -165,15 +166,17 @@ void local_Downsample( pixel_t * target , pixel_t * temp,int imageH,int  imageW,
 	#pragma acl taskwait label("downsampleGPU")
 }
 
-void local_sub(pixel_t *d_L,pixel_t *d_G,pixel_t *d_Result,int targetW,int targetH,int gaussianW,int l , int hw){
+void local_sub(pixel_t *d_L,pixel_t *d_G,pixel_t *d_Result,int targetW,int targetH,int gaussianW,int l , int hw,int y_offset){
 	char profInfo[50];
 	SetSubSize(targetW,targetH,gaussianW);
 	
 	#pragma acl task buffer(d_L) buffer(d_G) device_out(d_Result) workers(szLocalWorkSize_Sub[0]) groups(szGlobalWorkSize_Sub[0])label("Sub_GPU") taskid(profInfo) bind(DEVICE_SUB)
-	Sub_GPU(d_L,d_G,d_Result,l,hw,targetW,targetH);
+	Sub_GPU(d_L,d_G,d_Result,l,hw,y_offset,targetW,targetH);
 	#pragma acl taskwait label("Sub_GPU")
 }
 void local_PyramidDown(int imageW, int imageH, pixel_t * img, pixel_t * temp,pixel_t * target,pixel_t * h_Buff,int y_offset, int l,int j, int hw,int gaussianW){
+	
+
 	clock_gettime(CLOCK_MONOTONIC, &blur_time_start);
 
 	local_ConvBlur_GPU( imageW,  imageH, img, temp, h_Buff, gaussianW);
@@ -215,7 +218,7 @@ void local_PyramidUp_sub( int targetW, int targetH, pixel_t * img, pixel_t * tem
 
 	clock_gettime(CLOCK_MONOTONIC, &subtract_time_start);
 printf("%d %d %d %d %d  \n",targetH, targetW,gaussianW,l,hw );
-	local_sub( target ,  subtracted  ,R_line, targetH, targetW,gaussianW,l,hw);
+	local_sub( target ,  subtracted  ,R_line, targetW, targetH,gaussianW,l,hw,y_offset);
 
 	clock_gettime(CLOCK_MONOTONIC, &subtract_time_finish);
   	subtract_time_elapsed += (subtract_time_finish.tv_sec - subtract_time_start.tv_sec);
@@ -507,15 +510,15 @@ pixel_t * R_line	= 	(pixel_t *) malloc(imLPyramid[0].w*sizeof(pixel_t));
 	      	  	char profInfo[50];
 		        SetRemappingSize( imLPyramid[l].w, hw, l ) ;
 		        clock_gettime(CLOCK_MONOTONIC, &remapp_time_start);
-		        if (l==0)
-		        {
-		        	#pragma acl task buffer(G_pyramid_address_space[0]) in(pim) workers(szLocalWorkSize_Remap[0]) groups(szGlobalWorkSize_Remap[0]) label("remapp_GPU0") bind(DEVICE_REMAPP)  
-		    		remapp_GPU_level0( G_pyramid_address_space[0] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_);
-					#pragma acl taskwait label("remapp_GPU0")
-					//remapp_GP( pyramid_address_space, pimPyramid[l] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_,szLocalWorkSize_Remap[0],szGlobalWorkSize_Remap[0]/szLocalWorkSize_Remap[0]);
+		   //      if (l==0)
+		   //      {
+		   //      	#pragma acl task buffer(G_pyramid_address_space[0]) in(pim) workers(szLocalWorkSize_Remap[0]) groups(szGlobalWorkSize_Remap[0]) label("remapp_GPU0") bind(DEVICE_REMAPP)  
+		   //  		remapp_GPU_level0( G_pyramid_address_space[0] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_);
+					// #pragma acl taskwait label("remapp_GPU0")
+					// //remapp_GP( pyramid_address_space, pimPyramid[l] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_,szLocalWorkSize_Remap[0],szGlobalWorkSize_Remap[0]/szLocalWorkSize_Remap[0]);
 
-		    	}
-		    	else{
+		   //  	}
+		   //  	else{
 		    		pixel_t * gaussianP = imPyramid[l].img;
 
 		    		#pragma acl task buffer(G_pyramid_address_space[0]) in(gaussianP) in(pim) workers(szLocalWorkSize_Remap[0]) groups(szGlobalWorkSize_Remap[0]) label("remapp_GPU") bind(DEVICE_REMAPP)  
@@ -523,14 +526,22 @@ pixel_t * R_line	= 	(pixel_t *) malloc(imLPyramid[0].w*sizeof(pixel_t));
 					#pragma acl taskwait label("remapp_GPU")
 					//remapp_GP( pyramid_address_space, pimPyramid[l] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_,szLocalWorkSize_Remap[0],szGlobalWorkSize_Remap[0]/szLocalWorkSize_Remap[0]);
 
-		    	}
+		    	//}
 		    	clock_gettime(CLOCK_MONOTONIC, &remapp_time_finish);
 				remapp_time_elapsed += (remapp_time_finish.tv_sec - remapp_time_start.tv_sec);
 				remapp_time_elapsed += (remapp_time_finish.tv_nsec - remapp_time_start.tv_nsec) / 1000000000.0;
 
 #if 1
-		    	Pyramid[0].w = 2*hw;
-	    		Pyramid[0].h = 2*hw;
+				int yf = y*(1<<(l));
+        		
+          		int row_range_start = max(yf-hw,0);
+            	int row_range_end =   min(yf+hw,im.h);
+
+				int yfc = yf-row_range_start;
+				int yfclev0 = yfc>>l;
+            
+	   			Pyramid[0].w = 2*hw;//col_range.end - col_range.start;
+				Pyramid[0].h = row_range_end - row_range_start;
 		    	for (j = 1; j < l+2; j++) {
 		    		Pyramid[j].w = Pyramid[j-1].w/2 +Pyramid[j-1].w%2;
 		    		Pyramid[j].h = Pyramid[j-1].h/2 +Pyramid[j-1].h%2; 
@@ -547,10 +558,8 @@ pixel_t * R_line	= 	(pixel_t *) malloc(imLPyramid[0].w*sizeof(pixel_t));
 	      	//exit(0);
 	      	for (int x = 0; x < imLPyramid[l].w; ++x) {
 
-            	int yf = y*(1<<(l)) ;
             	int xf = x*(1<<(l)) ;
 
-				int yfclev0 = hw>>l;
 		       	int xfclev0 = hw>>l;
 
 #if 0          		

@@ -117,10 +117,12 @@ void SetConvolutionSize_local(int width, int height , int Gaussianwidth) {
   szLocalWorkSize1_Conv2D_local[0]  = (width+2*2);
   szLocalWorkSize1_Conv2D_local[1]  = 1;
 
-  szGlobalWorkSize2_Conv2D_local[0] = (width+2*2)*Gaussianwidth;
-  szGlobalWorkSize2_Conv2D_local[1] = height;
-  szLocalWorkSize2_Conv2D_local[0]  = (width+2*2);
+
+  szGlobalWorkSize2_Conv2D_local[0] = (height+2*2)*Gaussianwidth;
+  szGlobalWorkSize2_Conv2D_local[1] = width;
+  szLocalWorkSize2_Conv2D_local[0]  = (height+2*2);
   szLocalWorkSize2_Conv2D_local[1]  = 1;
+  //printf("width %d , height %d\n",width,height);
 }
 
 void local_ConvBlur_GPU(int imageW, int imageH, pixel_t * img,pixel_t * target,pixel_t * h_Buff,int num_of_images){
@@ -506,15 +508,15 @@ printf("malloc for imLPyramid done\n");
 	      	  	char profInfo[50];
 		        SetRemappingSize( imLPyramid[l].w, hw, l ) ;
 		        clock_gettime(CLOCK_MONOTONIC, &remapp_time_start);
-		        if (l==0)
-		        {
-		        	#pragma acl task out(G_pyramid_address_space[0]) in(pim) workers(szLocalWorkSize_Remap[0]) groups(szGlobalWorkSize_Remap[0]) label("remapp_GPU0") bind(DEVICE_REMAPP)  
-		    		remapp_GPU_level0( G_pyramid_address_space[0] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_);
-					#pragma acl taskwait label("remapp_GPU0")
-					//remapp_GP( pyramid_address_space, pimPyramid[l] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_,szLocalWorkSize_Remap[0],szGlobalWorkSize_Remap[0]/szLocalWorkSize_Remap[0]);
+		   //      if (l==0)
+		   //      {
+		   //      	#pragma acl task out(G_pyramid_address_space[0]) in(pim) workers(szLocalWorkSize_Remap[0]) groups(szGlobalWorkSize_Remap[0]) label("remapp_GPU0") bind(DEVICE_REMAPP)  
+		   //  		remapp_GPU_level0( G_pyramid_address_space[0] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_);
+					// #pragma acl taskwait label("remapp_GPU0")
+					// //remapp_GP( pyramid_address_space, pimPyramid[l] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_,szLocalWorkSize_Remap[0],szGlobalWorkSize_Remap[0]/szLocalWorkSize_Remap[0]);
 
-		    	}
-		    	else{
+		   //  	}
+		    	//else{
 		    		pixel_t * gaussianP = imPyramid[l].img;
 
 		    		#pragma acl task out(G_pyramid_address_space[0]) in(gaussianP) in(pim) workers(szLocalWorkSize_Remap[0]) groups(szGlobalWorkSize_Remap[0]) label("remapp_GPU") bind(DEVICE_REMAPP)  
@@ -522,13 +524,24 @@ printf("malloc for imLPyramid done\n");
 					#pragma acl taskwait label("remapp_GPU")
 					//remapp_GP( pyramid_address_space, pimPyramid[l] ,pim,y, imLPyramid[l].w, imLPyramid[l].h,im.w,im.h,l , sigma,alpha_,beta_,szLocalWorkSize_Remap[0],szGlobalWorkSize_Remap[0]/szLocalWorkSize_Remap[0]);
 
-		    	}
+		    	//}
 		    	clock_gettime(CLOCK_MONOTONIC, &remapp_time_finish);
 				remapp_time_elapsed += (remapp_time_finish.tv_sec - remapp_time_start.tv_sec);
 				remapp_time_elapsed += (remapp_time_finish.tv_nsec - remapp_time_start.tv_nsec) / 1000000000.0;
+				
 
-		    	Pyramid[0].w = 2*hw;
-	    		Pyramid[0].h = 2*hw;
+				int yf = y*(1<<(l));
+        		
+          		int row_range_start = max(yf-hw,0);
+            	int row_range_end =   min(yf+hw,im.h);
+
+				
+            
+	   			Pyramid[0].w = 2*hw;//col_range.end - col_range.start;
+				Pyramid[0].h = row_range_end - row_range_start;
+
+		    	// Pyramid[0].w = 2*hw;
+	    		// Pyramid[0].h = 2*hw;
 		    	for (j = 1; j < l+2; j++) {
 		    		Pyramid[j].w = Pyramid[j-1].w/2 +Pyramid[j-1].w%2;
 		    		Pyramid[j].h = Pyramid[j-1].h/2 +Pyramid[j-1].h%2; 
@@ -537,17 +550,19 @@ printf("malloc for imLPyramid done\n");
         		}
         		local_PyramidUp_sub(Pyramid[l].w, Pyramid[l].h, G_pyramid_address_space[l+1],   Temp_pyramid_address_space[0], L_pyramid_address_space[l],G_pyramid_address_space[l],Buff_pyramid_address_space[0],y,l,l+1,hw,imLPyramid[l].w);
 
-	      	for (int x = 0; x < imLPyramid[l].w; ++x) {
+				//int yf = y*(1<<(l)) ;
+				int yfc = yf-row_range_start;
+				int yfclev0 = yfc>>l;
+	      		
+	      		for (int x = 0; x < imLPyramid[l].w; ++x) {
 
-            	int yf = y*(1<<(l)) ;
-            	int xf = x*(1<<(l)) ;
+            		
+            		int xf = x*(1<<(l)) ;					
+		       		int xfclev0 = hw>>l;
 
-				int yfclev0 = hw>>l;
-		       	int xfclev0 = hw>>l;
-
-		       	pixel_t value =G_pyramid_address_space[l][Pyramid[l].w*Pyramid[l].h*x + Pyramid[l].w*yfclev0 + xfclev0]- L_pyramid_address_space[l][Pyramid[l].w*Pyramid[l].h*x + Pyramid[l].w*yfclev0 + xfclev0];
-  				imLPyramid[l].img[imLPyramid[l].w*y+x] =value;
-	      	}
+		       		pixel_t value =G_pyramid_address_space[l][Pyramid[l].w*Pyramid[l].h*x + Pyramid[l].w*yfclev0 + xfclev0]- L_pyramid_address_space[l][Pyramid[l].w*Pyramid[l].h*x + Pyramid[l].w*yfclev0 + xfclev0];
+  					imLPyramid[l].img[imLPyramid[l].w*y+x] =value;
+	      		}
 	    }
 	    
 		clock_gettime(CLOCK_MONOTONIC, &time_finish); 

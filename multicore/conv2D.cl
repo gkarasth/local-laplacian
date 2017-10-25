@@ -152,7 +152,8 @@ __kernel void convolutionRowGPUlocal(
     int num_of_images
 ){
     #pragma OPENCL EXTENSION cl_khr_fp64 : enable
-    const pixel_t d_Kernel[5] = {1,5,8,5,1};
+    //const pixel_t d_Kernel[5] = {1,5,8,5,1};
+    const pixel_t d_Kernel[5] = {0.05, 0.25, 0.4, 0.25, 0.05};
 
     //Data cache
     __local pixel_t data[kernelR + ROW_TILE_W + kernelR];
@@ -171,7 +172,7 @@ __kernel void convolutionRowGPUlocal(
             for(int k = -kernelR; k <= kernelR; k++)
                 sum += data[smemPos + k] * d_Kernel[kernelR - k];
 
-            d_Result[global_job*image_size +get_local_id(0) +get_group_id(1)*dataW ]= sum/WEIG;
+            d_Result[global_job*image_size +get_local_id(0) +get_group_id(1)*dataW ]= sum;
     }
 
     
@@ -190,7 +191,8 @@ __kernel void convolutionColumnGPUlocal(
 ){
     #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
-    const pixel_t d_Kernel[5] = {1,5,8,5,1};
+    //const pixel_t d_Kernel[5] = {1,5,8,5,1};
+    const pixel_t d_Kernel[5] = {0.05, 0.25, 0.4, 0.25, 0.05};
 
     //Data cache
    // __local double data[COLUMN_TILE_W * (kernelR + COLUMN_TILE_H + kernelR)];
@@ -201,17 +203,17 @@ __kernel void convolutionColumnGPUlocal(
     const int gmemPos = loadpos*dataW+get_group_id(1);
     const int global_job = get_group_id(0);
     const int image_size = dataH*dataW;
-    data[get_local_id(0)] = (loadpos>=0 && loadpos<dataW) ? d_Data[global_job*image_size + gmemPos] : 0;
+    data[get_local_id(0)] = (loadpos>=0 && loadpos<dataH) ? d_Data[global_job*image_size + gmemPos] : 0;
     
     barrier(CLK_LOCAL_MEM_FENCE);
     
     const int smemPos = get_local_id(0)+2;
-    if(get_local_id(0)< dataW){
+    if(get_local_id(0)< dataH){
             pixel_t sum = 0;
             for(int k = -kernelR; k <= kernelR; k++)
                 sum += data[smemPos + k] * d_Kernel[kernelR - k];
 
-            d_Result[global_job*image_size +get_local_id(0)*dataW +get_group_id(1) ]= sum/WEIG;
+            d_Result[global_job*image_size +get_local_id(0)*dataW +get_group_id(1) ]= sum;
     }
 }
 #endif

@@ -1,5 +1,10 @@
 #include "Image.h"
-#define R_TILE_W 172
+#define R_TILE_W 220
+
+#define min_i( a,  b) (a > b) ? (b) : (a);
+
+
+#define max_i( a,  b) (a > b) ? (a) : (b);
 
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 double SmoothStep_GPU(double x_min, double x_max, double x) {
@@ -76,20 +81,22 @@ __kernel void remapp_GPU(
 
   int global_y = y_offset;// + get_group_id(1);//gaussian y
     
+  //int subimage_size = hw*hw*4;
   
-  int subimage_size = hw*hw*4;
   
   int local_job_size = (get_local_size(0) - 2*hw)/(1<<(l)); //each block creates this amount of tone mapped sub images
   int global_x_offset  = local_job_size*get_group_id(0) ;  //x on the gaussian 
   int image_x = global_x_offset*(1<<(l)) + x;               //map x on image coordinates
   int load_pos = image_x-hw;                                //every thread loads from image position 
 
+  
   int yf = global_y*(1<<(l));
-  int row_range_start = yf-hw;
-  int row_range_end = yf+hw;
+
+  int row_range_start = (yf-hw > 0) ? (yf-hw) : (0);            //max_i(yf-hw,0);
+  int row_range_end =   (yf+hw < imageH) ? (yf+hw) : (imageH);  //min_i(yf+hw,imageH);
   
-  
- 
+  int subimage_size = hw*2*(row_range_end-row_range_start);
+
   int threadperjob = (get_local_size(0)/local_job_size);
   int job = x/threadperjob;
 
@@ -108,28 +115,28 @@ __kernel void remapp_GPU(
     barrier(CLK_LOCAL_MEM_FENCE);
 
     
-int xpos = x%threadperjob + job*(1<<l);   
+    int xpos = x%threadperjob + job*(1<<l);   
 
-if(job<local_job_size){
-    while (xpos-job*(1<<l)<2*hw)
-    {
+    if(job<local_job_size){
+        while (xpos-job*(1<<l)<2*hw)
+        {
 
-      pixel_t input = sh_data[xpos];
+          pixel_t input = sh_data[xpos];
 
-      int row_addres = (y-row_range_start)*2*hw;
-          
-      int subimage_addr = subimage_size*(global_x_offset + job);
-         
-      int output_dst = subimage_addr + (xpos -job*(1<<l)) + row_addres;
-      //d_Result[output_dst] = input;
-      RemappingFunction_GPU((double)input,(double)g0,sigma,alpha,beta,output_dst,d_Result);
+          int row_addres = (y-row_range_start)*2*hw;
+              
+          int subimage_addr = subimage_size*(global_x_offset + job);
+             
+          int output_dst = subimage_addr + (xpos -job*(1<<l)) + row_addres;
+          //d_Result[output_dst] = input;
+          RemappingFunction_GPU((double)input,(double)g0,sigma,alpha,beta,output_dst,d_Result);
 
-      xpos = xpos + threadperjob;
+          xpos = xpos + threadperjob;
 
-      }
-    
-}
-barrier(CLK_LOCAL_MEM_FENCE);
+          }
+        
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
   }
 }
 
@@ -157,7 +164,7 @@ __kernel void remapp_GPU_level0(
   int global_y = y_offset;// + get_group_id(1);//gaussian y
     
   
-  int subimage_size = hw*hw*4;
+  //int subimage_size = hw*hw*4;
   
   int local_job_size = (get_local_size(0) - 2*hw)/(1<<(l)); //each block creates this amount of tone mapped sub images
   int global_x_offset  = local_job_size*get_group_id(0) ;   //x on the gaussian 
@@ -165,10 +172,13 @@ __kernel void remapp_GPU_level0(
   int load_pos = image_x-hw;                                //every thread loads from image position 
 
   int yf = global_y*(1<<(l));
-  int row_range_start = yf-hw;
-  int row_range_end = yf+hw;
+  // int row_range_start = yf-hw;
+  // int row_range_end = yf+hw;
+  int row_range_start = (yf-hw > 0) ? (yf-hw) : (0);            //max_i(yf-hw,0);
+  int row_range_end =   (yf+hw < imageH) ? (yf+hw) : (imageH);  //min_i(yf+hw,imageH);
   
-  
+  int subimage_size = hw*2*(row_range_end-row_range_start);
+
  
   int threadperjob = (get_local_size(0)/local_job_size);
   int job = x/threadperjob;

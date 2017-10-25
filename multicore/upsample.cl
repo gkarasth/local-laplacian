@@ -14,7 +14,8 @@ __kernel void UpsampleGPU(
   #pragma OPENCL EXTENSION cl_khr_fp64 : enable
   int cstart= get_group_id(0)*(1<<(l)) - hw;
   int rstart = y_offset*(1<<(l)) -hw;
-  
+    if (rstart<0)rstart =0;
+
   int InputH = get_global_size(1);
   int InputW = get_local_size(0);
   int r_off;
