@@ -1,5 +1,4 @@
 #include "readmap.h"
-#include "readmap.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <FreeImage.h>
@@ -98,7 +97,7 @@ mapper *rgbmap;
 
 
         
-    }
+    }    
     Image resize_image(Image *inputimg)
     {
 
@@ -119,24 +118,23 @@ mapper *rgbmap;
 
         result.w = result.w + result.w%2;
         result.h = result.h + result.h%2;
-        for (i = 0; i < 8; ++i)
-        {
-            result.w/=2;
-            result.h/=2;
-        }
-        result.h *=256;
-        result.w *=256;
-        if (result.h!=temph)
-            result.h +=256;
+        // for (i = 0; i < 8; ++i)
+        // {
+        //     result.w/=2;
+        //     result.h/=2;
+        // }
+        // result.h *=256;
+        // result.w *=256;
+        // if (result.h!=temph)
+        //     result.h +=256;
 
-        if (result.w!=tempw)
-        result.w +=256;
+        // if (result.w!=tempw)
+        // result.w +=256;
 
         //result = newImage(result.w,result.h);
         result.img = (pixel_t *)malloc(result.w * result.h * sizeof(pixel_t));
         printf("converted to : %d x %d\n", result.w, result.h);
-
-       
+        
         for (y = 0; y <result.h; ++y)
         {
             for (x = 0; x <result.w; ++x)
@@ -144,7 +142,6 @@ mapper *rgbmap;
                 result.img[x+result.w*y] = 0;
             }
         }
-
         for (y = 0; y <result.h; ++y)
         {
             for (x = 0; x <result.w; ++x)
@@ -161,22 +158,13 @@ mapper *rgbmap;
             
         }
  
-        // for (y = 0; y <temph; ++y)
-        // {
-        //     for (x = 0; x <tempw; ++x)
-        //     { 
-        //         result.img[100 +100*result.w+x+result.w*y] = (pixel_t)temp[x + tempw*y];
-        //     }
-        // }
-
-
         free(temp);
         printf("converted to : %d x %d\n", result.w, result.h);
 
         return result;
     }
-	
-   void FULLImagewrite(FULLImage* img,Image inputimg,char *out_filename){
+    
+    void FULLImagewrite(FULLImage* img,Image inputimg,char *out_filename){
         FIBITMAP *bmp = 0;
         int x,y;
         double temp_pxl;

@@ -1,0 +1,99 @@
+#define DEVICE_REMAPP 1
+#define DEVICE_CONVROW 1
+#define DEVICE_CONVCOL 1
+#define DEVICE_UPSAMPLE 1
+#define DEVICE_DOWNSAMPLE 1
+#define DEVICE_SUB 0
+
+
+Time  = 26076.413923 ms
+
+#define DEVICE_REMAPP 1
+#define DEVICE_CONVROW 1
+#define DEVICE_CONVCOL 1
+#define DEVICE_UPSAMPLE 1
+#define DEVICE_DOWNSAMPLE 1
+#define DEVICE_SUB 1
+>>>> Time  = 25938.613226 ms
+
+#define DEVICE_REMAPP 0
+#define DEVICE_CONVROW 0
+#define DEVICE_CONVCOL 0
+#define DEVICE_UPSAMPLE 0
+#define DEVICE_DOWNSAMPLE 0
+#define DEVICE_SUB 0
+Time  = 29974.364817 ms
+
+#define DEVICE_REMAPP 0
+#define DEVICE_CONVROW 0
+#define DEVICE_CONVCOL 0
+#define DEVICE_UPSAMPLE 1
+#define DEVICE_DOWNSAMPLE 1
+#define DEVICE_SUB 1
+30501.196809 ms
+
+
+#define DEVICE_REMAPP 0
+#define DEVICE_CONVROW 0
+#define DEVICE_CONVCOL 0
+#define DEVICE_UPSAMPLE 1
+#define DEVICE_DOWNSAMPLE 1
+#define DEVICE_SUB 0
+>>>> Time  = 30022.296019 ms
+
+
+PROFILING < CPU  > remapp_GPU0: 2.151966 ms 
+PROFILING < CPU  > convolutionRowGPU_local: 1.520922 ms 
+PROFILING < CPU  > convolutionColumnGPU_local: 1.088705 ms 
+PROFILING < CPU  > downsampleGPU: 0.056735 ms 
+PROFILING < CPU  > Upsample_GPU: 0.059898 ms 
+PROFILING < CPU  > convolutionRowGPU_local: 1.505112 ms 
+PROFILING < CPU  > convolutionColumnGPU_local: 1.171211 ms 
+PROFILING < CPU  > Sub_GPU: 0.074340 ms 
+
+PROFILING < GPU > remapp_GPU0: 10.899488 ms 
+PROFILING < GPU > convolutionRowGPU_local: 1.394976 ms 
+PROFILING < GPU > convolutionColumnGPU_local: 2.578240 ms 
+PROFILING < GPU > downsampleGPU: 0.013184 ms 
+PROFILING < GPU > Upsample_GPU: 0.026176 ms 
+PROFILING < GPU > convolutionRowGPU_local: 1.797056 ms 
+PROFILING < GPU > convolutionColumnGPU_local: 2.578272 ms 
+PROFILING < GPU > Sub_GPU: 0.052832 ms 
+
+
+PROFILING < GPU > remapp_GPU0: 11.286176 ms 
+level = 1 ,hw =10  ,last 2 element 5
+132 10 
+PROFILING < GPU > remapp_GPU: 11.668896 ms 
+level = 2 ,hw =22  ,last 2 element 5
+132 12 
+PROFILING < GPU > remapp_GPU: 11.040512 ms 
+level = 3 ,hw =46  ,last 2 element 5
+132 26 
+PROFILING < GPU > remapp_GPU: 7.911424 ms 
+>>>> Time  = 325.936160 ms
+
+PROFILING < CPU  > remapp_GPU0: 3.667882 ms 
+level = 1 ,hw =10  ,last 2 element 5
+132 10 
+PROFILING < CPU  > remapp_GPU: 13.137035 ms 
+level = 2 ,hw =22  ,last 2 element 5
+132 12 
+PROFILING < CPU  > remapp_GPU: 21.955300 ms 
+level = 3 ,hw =46  ,last 2 element 5
+132 26 
+PROFILING < CPU  > remapp_GPU: 51.576589 ms 
+>>>> Time  = 348.666807 ms
+///////////////////////////////////////////
+264 4 
+PROFILING < CPU  > remapp_GPU0: 2.823366 ms 
+level = 1 ,hw =10  ,last 2 element 5
+264 5 
+PROFILING < CPU  > remapp_GPU: 8.752987 ms 
+level = 2 ,hw =22  ,last 2 element 5
+264 5 
+PROFILING < CPU  > remapp_GPU: 15.832183 ms 
+level = 3 ,hw =46  ,last 2 element 5
+264 7 
+PROFILING < CPU  > remapp_GPU: 38.726096 ms 
+>>>> Time  = 277.412782 ms

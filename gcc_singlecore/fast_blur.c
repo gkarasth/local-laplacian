@@ -87,11 +87,7 @@ void sub(pixel_t * target , pixel_t * Sed , pixel_t * Sor ,int imageH,int imageW
 	int x,y;
 	for (y = 0; y < imageH; y++) {
     	for (x = 0; x < imageW; x++) {
-			// target[y*(imageW+imageW%2)+x] = Sed[y*imageW+x]-Sor[y*(imageW+imageW%2)+x];
  			  target[y*imageW+x] = Sed[y*imageW+x]-Sor[y*imageW+x];
-        //printf("%f %f\n",Sed[y*imageW+x],Sor[y*imageW+x] );
-      //target[y*imageW+x] = Sor[y*imageW+x]-Sed[y*imageW+x];
-
 		}
 	}
 }
@@ -101,10 +97,10 @@ void Upsample(pixel_t * target , pixel_t * source,int imageH, int imageW,int c_o
 	int src_imageW = imageW/2 + imageW%2;
 	int src_imageH = imageH/2 + imageH%2;
   int x,y;
-   for (int i = 0; i < imageW*imageH; ++i)
-    {
-      target[i] =0;//gp[init +i];
-    }
+  for (int i = 0; i < imageW*imageH; ++i)
+  {
+    target[i] =0;//gp[init +i];
+  }
   for (y = 0; y < src_imageH; y++) {
     for (x = 0; x < src_imageW; x++) {
       int addr0x = 2*x + c_off ;
@@ -120,7 +116,7 @@ void Upsample(pixel_t * target , pixel_t * source,int imageH, int imageW,int c_o
       int addr3y = 2*y + 1 - r_off; 
 
       if(addr0y<imageH && addr0x<imageW)
-        target[addr0x+addr0y*imageW]=4*source[x+y*src_imageW];
+        target[addr0x+addr0y*imageW]=4.0*source[x+y*src_imageW];
       if(addr1y<imageH && addr1x<imageW)
         target[addr1x+addr1y*imageW]=0;//source[x+y*src_imageW];
       if(addr2y<imageH && addr2x<imageW)
@@ -129,39 +125,13 @@ void Upsample(pixel_t * target , pixel_t * source,int imageH, int imageW,int c_o
         target[addr3x+addr3y*imageW]=0;//source[x+y*src_imageW];
     }
   }
-	// for (int i = 0; i < imageW*imageH; ++i)
-	// {
-	// 	target[i] =0;//gp[init +i];
-	// }
-	// int x,y;
-	// for (y = 0; y < imageH/2; y++) {
- //    	for (x = 0; x < imageW/2; x++) {
- //    		target[y*2*imageW +2*x +c_off+(r_off*imageW)] = source[ y*src_imageW+x];
- //    		target[(y*2+1)*imageW +2*x+c_off+(r_off*imageW) ] = source[ y*src_imageW+x];//0;
- //    		target[y*2*imageW +2*x+1 +c_off+(r_off*imageW)] = source[ y*src_imageW+x];//0;
- //    		target[(y*2+1)*imageW +2*x+1+c_off+(r_off*imageW)  ] = source[ y*src_imageW+x];//0;
- //    	}
- //  }
- //  if(imageW%2){
- //  	for (y = 0; y < imageH/2; y++) {
- //  			target[y*2*imageW +(imageW-1) +c_off+(r_off*imageW)] = source[ y*src_imageW+(src_imageW-1)];
- //  			target[(y*2+1)*imageW +(imageW-1)+c_off+(r_off*imageW) ] = source[ y*src_imageW+x];//0;
- //  	}
- //  }
- //  if(imageH%2){
- //    for (x = 0; x < imageW/2; x++) {
- //  		target[(imageH-1)*imageW +2*x +c_off+(r_off*imageW)] = source[ (src_imageH-1)*src_imageW+x];
- //  		target[(imageH-1)*imageW +2*x+1 +c_off+(r_off*imageW)] = source[ y*src_imageW+x];//0;
- //  	}
- //  }
- //  if(imageH%2&&imageW%2)
- //  	target[imageW*(imageH-1) + imageW-1]=source[ y*src_imageW+x];//0;
 }
 
 void Downsample( pixel_t * target ,pixel_t * source,int src_imageH, int src_imageW,int c_off, int r_off){
 	int x,y;
 	int dst_imH = src_imageH/2+src_imageH%2;
 	int dst_imW = src_imageW/2+src_imageW%2;
+  
 	for (y = 0; y < dst_imH; y++) {
 		for (x = 0; x < dst_imW; x++) {
       if(2*x + c_off>=src_imageW || 2*y + r_off>=src_imageH){
@@ -178,19 +148,19 @@ void Downsample( pixel_t * target ,pixel_t * source,int src_imageH, int src_imag
 
 void PyramidDown(int imageW, int imageH, pixel_t * img, pixel_t * h_Buffr,pixel_t * target,int c_off, int r_off){
   
-  clock_gettime(CLOCK_MONOTONIC, &blur_time_start);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &blur_time_start);
 	
   ConvBlur( imageW,  imageH,  img, h_Buffr);
 	
-  clock_gettime(CLOCK_MONOTONIC, &blur_time_finish);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &blur_time_finish);
   blur_time_elapsed += (blur_time_finish.tv_sec - blur_time_start.tv_sec);
   blur_time_elapsed += (blur_time_finish.tv_nsec - blur_time_start.tv_nsec) / 1000000000.0;
 //////////////////////////////////////////////////////////////////////////////////////////////////////
-  clock_gettime(CLOCK_MONOTONIC, &downsample_time_start);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &downsample_time_start);
 
 	Downsample( target ,  h_Buffr, imageH,  imageW,c_off,r_off);
 
-  clock_gettime(CLOCK_MONOTONIC, &downsample_time_finish);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &downsample_time_finish);
   downsample_time_elapsed += (downsample_time_finish.tv_sec - downsample_time_start.tv_sec);
   downsample_time_elapsed += (downsample_time_finish.tv_nsec - downsample_time_start.tv_nsec) / 1000000000.0;
 	
@@ -200,27 +170,27 @@ void PyramidDown(int imageW, int imageH, pixel_t * img, pixel_t * h_Buffr,pixel_
 void PyramidUp_sub(int imageW, int imageH, pixel_t * img, pixel_t * h_Buffr,pixel_t * target,pixel_t * subtracted,int c_off, int r_off, int targetW, int targetH){
 	
 
-  clock_gettime(CLOCK_MONOTONIC, &upsample_time_start);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &upsample_time_start);
 
   Upsample(h_Buffr ,  img,  targetH, targetW,c_off,r_off,subtracted);
 
-  clock_gettime(CLOCK_MONOTONIC, &upsample_time_finish);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &upsample_time_finish);
   upsample_time_elapsed += (upsample_time_finish.tv_sec - upsample_time_start.tv_sec);
   upsample_time_elapsed += (upsample_time_finish.tv_nsec - upsample_time_start.tv_nsec) / 1000000000.0;
 //////////////////////////////////////////////////////////////////////////////////////////////////////	
-  clock_gettime(CLOCK_MONOTONIC, &blur_time_start);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &blur_time_start);
 	
   ConvBlur( targetW,  targetH,  h_Buffr, target);
   
-  clock_gettime(CLOCK_MONOTONIC, &blur_time_finish);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &blur_time_finish);
   blur_time_elapsed += (blur_time_finish.tv_sec - blur_time_start.tv_sec);
   blur_time_elapsed += (blur_time_finish.tv_nsec - blur_time_start.tv_nsec) / 1000000000.0;
 //////////////////////////////////////////////////////////////////////////////////////////////////////	
-	clock_gettime(CLOCK_MONOTONIC, &subtract_time_start);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &subtract_time_start);
 
   sub( target ,  subtracted ,  target , targetH, targetW);
 
-  clock_gettime(CLOCK_MONOTONIC, &subtract_time_finish);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &subtract_time_finish);
   subtract_time_elapsed += (subtract_time_finish.tv_sec - subtract_time_start.tv_sec);
   subtract_time_elapsed += (subtract_time_finish.tv_nsec - subtract_time_start.tv_nsec) / 1000000000.0;
 	
@@ -228,19 +198,19 @@ void PyramidUp_sub(int imageW, int imageH, pixel_t * img, pixel_t * h_Buffr,pixe
 void PyramidUp(int imageW, int imageH, pixel_t * img, pixel_t * h_Buffr,pixel_t * target,pixel_t * subtracted,int c_off, int r_off, int targetW, int targetH){
   
 
-  clock_gettime(CLOCK_MONOTONIC, &upsample_time_start);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &upsample_time_start);
 
   Upsample(h_Buffr ,  img,  targetH, targetW,c_off,r_off,subtracted);
 
-  clock_gettime(CLOCK_MONOTONIC, &upsample_time_finish);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &upsample_time_finish);
   upsample_time_elapsed += (upsample_time_finish.tv_sec - upsample_time_start.tv_sec);
   upsample_time_elapsed += (upsample_time_finish.tv_nsec - upsample_time_start.tv_nsec) / 1000000000.0;
 //////////////////////////////////////////////////////////////////////////////////////////////////////  
-  clock_gettime(CLOCK_MONOTONIC, &blur_time_start);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &blur_time_start);
   
   ConvBlur( targetW,  targetH,  h_Buffr, target);
   
-  clock_gettime(CLOCK_MONOTONIC, &blur_time_finish);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &blur_time_finish);
   blur_time_elapsed += (blur_time_finish.tv_sec - blur_time_start.tv_sec);
   blur_time_elapsed += (blur_time_finish.tv_nsec - blur_time_start.tv_nsec) / 1000000000.0;
 //////////////////////////////////////////////////////////////////////////////////////////////////////  
