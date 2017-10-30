@@ -144,37 +144,54 @@ __kernel void convolutionColumnGPU(
 
 
 
+
+
+
 __kernel void convolutionRowGPUlocal(
     __global pixel_t *d_Result,
     __global pixel_t *d_Data,
     int dataW,
     int dataH,
+    int hw,
+    int l,
+    int j,
+    int ImageW,
     int num_of_images
 ){
     #pragma OPENCL EXTENSION cl_khr_fp64 : enable
     //const pixel_t d_Kernel[5] = {1,5,8,5,1};
     const pixel_t d_Kernel[5] = {0.05, 0.25, 0.4, 0.25, 0.05};
+    const int global_job = get_group_id(0);
+
+    int cstart = global_job*(1<<(l)) - hw;
+    int cend =   global_job*(1<<(l)) + hw;
+      if (cstart<0) cstart = 0;         //max
+      if (cend >ImageW) cend = ImageW;  //min 
+    
+    int RealW= cend - cstart;
+    for (int i = 1; i < j; ++i)
+    {
+        RealW = RealW/2 + RealW%2;
+    }
+    //RealW = dataW;
 
     //Data cache
     __local pixel_t data[kernelR + ROW_TILE_W + kernelR];
-
     const int loadpos = get_local_id(0)-2;
-    const int gmemPos = loadpos+get_group_id(1)*dataW;
-    const int global_job = get_group_id(0);
+    const int gmemPos = loadpos+get_group_id(1)*RealW;
     const int image_size = dataH*dataW;
-    data[get_local_id(0)] = (loadpos>=0 && loadpos<dataW) ? d_Data[global_job*image_size + gmemPos] : 0;
+    data[get_local_id(0)] = (loadpos>=0 && loadpos<RealW) ? d_Data[global_job*image_size + gmemPos] : 0;
     
     barrier(CLK_LOCAL_MEM_FENCE);
     
     const int smemPos = get_local_id(0)+2;
-    if(get_local_id(0)< dataW){
+    if(get_local_id(0) < RealW){
             pixel_t sum = 0;
             for(int k = -kernelR; k <= kernelR; k++)
                 sum += data[smemPos + k] * d_Kernel[kernelR - k];
 
-            d_Result[global_job*image_size +get_local_id(0) +get_group_id(1)*dataW ]= sum;
+            d_Result[global_job*image_size +get_local_id(0) + get_group_id(1)*RealW ]= sum;
     }
-
     
 }
 
@@ -185,35 +202,48 @@ __kernel void convolutionColumnGPUlocal(
     __global pixel_t *d_Data,
     int dataW,
     int dataH,
-    int smemStride,
-    int gmemStride,
+    int hw,
+    int l,
+    int j,
+    int ImageW,
     int num_of_images
 ){
     #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
     //const pixel_t d_Kernel[5] = {1,5,8,5,1};
     const pixel_t d_Kernel[5] = {0.05, 0.25, 0.4, 0.25, 0.05};
+    
+    const int global_job = get_group_id(0);
+    
+    int cstart = global_job*(1<<(l)) - hw;
+    int cend =   global_job*(1<<(l)) + hw;
+      if (cstart<0) cstart = 0;         //max
+      if (cend >ImageW) cend = ImageW;  //min 
+    
+    int RealW = cend - cstart;
+    for (int i = 1; i < j; ++i)
+    {
+        RealW = RealW/2 + RealW%2;
+    }
 
-    //Data cache
-   // __local double data[COLUMN_TILE_W * (kernelR + COLUMN_TILE_H + kernelR)];
-    //Data cache
+
     __local pixel_t data[kernelR + ROW_TILE_W + kernelR];
 
-    const int loadpos = get_local_id(0)-2;
-    const int gmemPos = loadpos*dataW+get_group_id(1);
-    const int global_job = get_group_id(0);
-    const int image_size = dataH*dataW;
-    data[get_local_id(0)] = (loadpos>=0 && loadpos<dataH) ? d_Data[global_job*image_size + gmemPos] : 0;
-    
-    barrier(CLK_LOCAL_MEM_FENCE);
-    
-    const int smemPos = get_local_id(0)+2;
-    if(get_local_id(0)< dataH){
-            pixel_t sum = 0;
-            for(int k = -kernelR; k <= kernelR; k++)
-                sum += data[smemPos + k] * d_Kernel[kernelR - k];
+        const int loadpos = get_local_id(0)-2;
+        const int gmemPos = loadpos*RealW+get_group_id(1);
+        
+        const int image_size = dataH*dataW;
+        data[get_local_id(0)] = (loadpos>=0 && loadpos<dataH) ? d_Data[global_job*image_size + gmemPos] : 0;
+        
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        const int smemPos = get_local_id(0)+2;
+        if(get_local_id(0)< dataH && get_group_id(1)<RealW){
+                pixel_t sum = 0;
+                for(int k = -kernelR; k <= kernelR; k++)
+                    sum += data[smemPos + k] * d_Kernel[kernelR - k];
 
-            d_Result[global_job*image_size +get_local_id(0)*dataW +get_group_id(1) ]= sum;
+                d_Result[global_job*image_size +get_local_id(0)*RealW +get_group_id(1) ]= sum;
+        }
     }
-}
 #endif

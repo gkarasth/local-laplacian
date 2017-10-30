@@ -125,23 +125,21 @@ void SetConvolutionSize_local(int width, int height , int Gaussianwidth) {
   //printf("width %d , height %d\n",width,height);
 }
 
-void local_ConvBlur_GPU(int imageW, int imageH, pixel_t * img,pixel_t * target,pixel_t * h_Buff,int num_of_images){
+void local_ConvBlur_GPU(int imageW, int imageH, pixel_t * img,pixel_t * target,pixel_t * h_Buff,int num_of_images,int hw ,int l,int j,int w){
 	SetConvolutionSize_local(imageW,imageH,num_of_images);
 	//double *h_Buff = (double *)malloc(imageH*imageW * sizeof(double));
 
 
 	char profInfo[50];
 	//sprintf(profInfo," % d convolutionRow",imageH);
-
 	#pragma acl task in(h_Buff) in(img) workers(szLocalWorkSize1_Conv2D_local[0],szLocalWorkSize1_Conv2D_local[1]) groups(szGlobalWorkSize1_Conv2D_local[0],szGlobalWorkSize1_Conv2D_local[1]) label("convolutionRowGPU_local") taskid(profInfo) bind(DEVICE_CONVROW)  
-	convolutionRowGPUlocal(h_Buff,img,imageW,imageH,num_of_images);
+	convolutionRowGPUlocal(h_Buff,img,imageW,imageH,hw,l,j,im.w,num_of_images);
 	#pragma acl taskwait label("convolutionRowGPU_local")
 
-	int  smemStride = convColumnTileWidth_local * szLocalWorkSize2_Conv2D_local[1];
-	int  gmemStride = imageW * szLocalWorkSize2_Conv2D_local[1];
+
 
 	#pragma acl task in(h_Buff) inout(target) workers(szLocalWorkSize2_Conv2D_local[0],szLocalWorkSize2_Conv2D_local[1]) groups(szGlobalWorkSize2_Conv2D_local[0],szGlobalWorkSize2_Conv2D_local[1]) label("convolutionColumnGPU_local") taskid(profInfo) bind(DEVICE_CONVCOL) 
-	convolutionColumnGPUlocal(target,h_Buff,imageW,imageH,smemStride,gmemStride,num_of_images);
+	convolutionColumnGPUlocal(target,h_Buff,imageW,imageH,hw,l,j,im.w,num_of_images);
 	#pragma acl taskwait label("convolutionColumnGPU_local")
 
 }
@@ -151,7 +149,7 @@ void local_Upsample(pixel_t *d_Result,pixel_t *d_Input,int y_offset,int ResultW,
 	SetupsampleSize(ResultW/2+ResultW%2,ResultH/2+ResultH%2 ,gaussianW);
 
 	#pragma acl task inout(d_Result) in(d_Input) workers(szLocalWorkSize_upSample[0],szLocalWorkSize_upSample[1]) groups(szGlobalWorkSize_upSample[0],szGlobalWorkSize_upSample[1])label("Upsample_GPU") taskid(profInfo) bind(DEVICE_UPSAMPLE)
-	UpsampleGPU( d_Result,   d_Input,  y_offset,  ResultW, ResultH,  l, j, hw);
+	UpsampleGPU( d_Result,   d_Input,  y_offset,  ResultW, ResultH,im.w,  l, j, hw);
 	#pragma acl taskwait label("Upsample_GPU")
 }
 
@@ -160,7 +158,7 @@ void local_Downsample( pixel_t * target , pixel_t * temp,int imageH,int  imageW,
 	SetSubsampleSize(imageW/2+imageW%2,imageH/2+imageH%2 ,gaussianW);
 
 	#pragma acl task inout(target) in(temp) workers(szLocalWorkSize_subSample[0],szLocalWorkSize_subSample[1]) groups(szGlobalWorkSize_subSample[0],szGlobalWorkSize_subSample[1]) label("downsampleGPU") taskid(profInfo) bind(DEVICE_DOWNSAMPLE)  
-	downsampleGPU(target,temp,     y_offset,      imageW,   imageH,     l, j,    hw);
+	downsampleGPU(target,temp,     y_offset,      imageW,   imageH,im.w,     l, j,    hw);
 	#pragma acl taskwait label("downsampleGPU")
 }
 
@@ -173,15 +171,19 @@ void local_sub(pixel_t *d_Result,pixel_t *d_Input,int targetW,int targetH,int ga
 	#pragma acl taskwait label("Sub_GPU")
 }
 void local_PyramidDown(int imageW, int imageH, pixel_t * img, pixel_t * temp,pixel_t * target,pixel_t * h_Buff,int y_offset, int l,int j, int hw,int gaussianW){
-	
-	
+
+
+
 	clock_gettime(CLOCK_MONOTONIC, &blur_time_start);
 	
-	local_ConvBlur_GPU( imageW,  imageH, img, temp, h_Buff, gaussianW);
-	
+	local_ConvBlur_GPU( imageW,  imageH, img, temp, h_Buff, gaussianW,hw , l,j ,-1);
+
+
 	clock_gettime(CLOCK_MONOTONIC, &blur_time_finish);
   	blur_time_elapsed += (blur_time_finish.tv_sec - blur_time_start.tv_sec);
   	blur_time_elapsed += (blur_time_finish.tv_nsec - blur_time_start.tv_nsec) / 1000000000.0;
+
+
 
   	clock_gettime(CLOCK_MONOTONIC, &downsample_time_start);	
 
@@ -190,6 +192,7 @@ void local_PyramidDown(int imageW, int imageH, pixel_t * img, pixel_t * temp,pix
 	clock_gettime(CLOCK_MONOTONIC, &downsample_time_finish);
   	downsample_time_elapsed += (downsample_time_finish.tv_sec - downsample_time_start.tv_sec);
   	downsample_time_elapsed += (downsample_time_finish.tv_nsec - downsample_time_start.tv_nsec) / 1000000000.0;
+
 
 	//local_Downsample( target ,  img, imageH,  imageW,y_offset,l,j,hw,gaussianW);
 }
@@ -205,10 +208,11 @@ void local_PyramidUp_sub( int targetW, int targetH, pixel_t * img, pixel_t * tem
   	upsample_time_elapsed += (upsample_time_finish.tv_sec - upsample_time_start.tv_sec);
   	upsample_time_elapsed += (upsample_time_finish.tv_nsec - upsample_time_start.tv_nsec) / 1000000000.0;
 
+ 
 
 	clock_gettime(CLOCK_MONOTONIC, &blur_time_start);
 	
-	local_ConvBlur_GPU( targetW,  targetH, temp, target, h_Buff, gaussianW);
+	local_ConvBlur_GPU( targetW,  targetH, temp, target, h_Buff, gaussianW,hw ,l,j,-1);
   	
   	clock_gettime(CLOCK_MONOTONIC, &blur_time_finish);
   	blur_time_elapsed += (blur_time_finish.tv_sec - blur_time_start.tv_sec);
@@ -536,10 +540,10 @@ printf("malloc for imLPyramid done\n");
             	int row_range_end =   min(yf+hw,im.h);
 
 				
-            
+
 	   			Pyramid[0].w = 2*hw;//col_range.end - col_range.start;
 				Pyramid[0].h = row_range_end - row_range_start;
-
+ 
 		    	// Pyramid[0].w = 2*hw;
 	    		// Pyramid[0].h = 2*hw;
 		    	for (j = 1; j < l+2; j++) {
@@ -553,14 +557,20 @@ printf("malloc for imLPyramid done\n");
 				//int yf = y*(1<<(l)) ;
 				int yfc = yf-row_range_start;
 				int yfclev0 = yfc>>l;
-	      		
 	      		for (int x = 0; x < imLPyramid[l].w; ++x) {
 
             		
-            		int xf = x*(1<<(l)) ;					
-		       		int xfclev0 = hw>>l;
+            		int xf = x*(1<<(l)) ;
+            		col_range.start = max(xf-hw,0);
+            	    col_range.end =   min(xf+hw,im.w);
+            	    int col_w = col_range.end- col_range.start;		
+            	    int xfc = xf - col_range.start;
+		       		int xfclev0 = xfc>>l;
+		    		for (j = 1; j < l+1; j++) {
+		    			col_w = col_w/2+ col_w%2;
+        			}
 
-		       		pixel_t value =G_pyramid_address_space[l][Pyramid[l].w*Pyramid[l].h*x + Pyramid[l].w*yfclev0 + xfclev0]- L_pyramid_address_space[l][Pyramid[l].w*Pyramid[l].h*x + Pyramid[l].w*yfclev0 + xfclev0];
+		       		pixel_t value =G_pyramid_address_space[l][Pyramid[l].w*Pyramid[l].h*x + col_w*yfclev0 + xfclev0]- L_pyramid_address_space[l][Pyramid[l].w*Pyramid[l].h*x + col_w*yfclev0 + xfclev0];
   					imLPyramid[l].img[imLPyramid[l].w*y+x] =value;
 	      		}
 	    }
@@ -583,7 +593,8 @@ printf("malloc for imLPyramid done\n");
 	time_elapsed = (time_finish.tv_sec - time_start.tv_sec);
 	time_elapsed += (time_finish.tv_nsec - time_start.tv_nsec) / 1000000000.0;
 	printf("\n\n");
-	printf(">>>> Time  = %f ms\n",time_elapsed_t[0]*1000);
+	printf("level %d \n\n",0);
+	printf(">>>> level Time  = %f ms\n",time_elapsed_t[0]*1000);
 	printf(">>>> Time remap = %f ms\n",remapp_time_elapsed_t[0]*1000);
 	printf(">>>> Time blur  = %f ms\n",blur_time_elapsed_t[0]*1000);
 	printf(">>>> Time upsample = %f ms\n",upsample_time_elapsed_t[0]*1000);
@@ -593,19 +604,21 @@ printf("malloc for imLPyramid done\n");
 	for (int l = 1; l < J-1; l++)
 	{
 		printf("level %d \n\n",l);
-		printf(">>>> Time  = %f ms\n",time_elapsed_t[l]*1000-time_elapsed_t[l-1]*1000);
+		printf(">>>> level Time  = %f ms\n",time_elapsed_t[l]*1000-time_elapsed_t[l-1]*1000);
 		printf(">>>> Time remap = %f ms\n",remapp_time_elapsed_t[l]*1000-remapp_time_elapsed_t[l-1]*1000);
 		printf(">>>> Time blur  = %f ms\n",blur_time_elapsed_t[l]*1000-blur_time_elapsed_t[l-1]*1000);
 		printf(">>>> Time upsample = %f ms\n",upsample_time_elapsed_t[l]*1000-upsample_time_elapsed_t[l-1]*1000);
 		printf(">>>> Time downsample = %f ms\n",downsample_time_elapsed_t[l]*1000-downsample_time_elapsed_t[l-1]*1000);
 		printf(">>>> Time subtract = %f ms\n",subtract_time_elapsed_t[l]*1000-subtract_time_elapsed_t[l-1]*1000);
 	}
-	printf(">>>> Time  = %f ms\n",time_elapsed*1000);
-	printf(">>>> Time remap = %f ms\n",remapp_time_elapsed*1000);
-	printf(">>>> Time blur  = %f ms\n",blur_time_elapsed*1000);
-	printf(">>>> Time upsample = %f ms\n",upsample_time_elapsed*1000);
-	printf(">>>> Time downsample = %f ms\n",downsample_time_elapsed*1000);
-	printf(">>>> Time subtract = %f ms\n",subtract_time_elapsed*1000);
+	printf("Total \n");
+
+	printf(">>>> Total time  = %f ms\n",time_elapsed*1000);
+	printf(">>>> Total time remap = %f ms\n",remapp_time_elapsed*1000);
+	printf(">>>> Total time blur  = %f ms\n",blur_time_elapsed*1000);
+	printf(">>>> Total time upsample = %f ms\n",upsample_time_elapsed*1000);
+	printf(">>>> Total time downsample = %f ms\n",downsample_time_elapsed*1000);
+	printf(">>>> Total time subtract = %f ms\n",subtract_time_elapsed*1000);
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////  
     // Now collapse the output laplacian pyramid
     // printf("Collapsing laplacian pyramid down to output image\n");

@@ -127,7 +127,7 @@ void SetConvolutionSize_local(int width, int height , int Gaussianwidth) {
   szLocalWorkSize2_Conv2D_local[1]  = 1;
 }
 
-void local_ConvBlur_GPU(int imageW, int imageH, pixel_t * img,pixel_t * target,pixel_t * h_Buff,int num_of_images){
+void local_ConvBlur_GPU(int imageW, int imageH, pixel_t * img,pixel_t * target,pixel_t * h_Buff,int num_of_images,int hw ,int l,int j){
 	SetConvolutionSize_local(imageW,imageH,num_of_images);
 	//double *h_Buff = (double *)malloc(imageH*imageW * sizeof(double));
 
@@ -136,14 +136,13 @@ void local_ConvBlur_GPU(int imageW, int imageH, pixel_t * img,pixel_t * target,p
 	//sprintf(profInfo," % d convolutionRow",imageH);
 
 	#pragma acl task buffer(h_Buff) buffer(img) workers(szLocalWorkSize1_Conv2D_local[0],szLocalWorkSize1_Conv2D_local[1]) groups(szGlobalWorkSize1_Conv2D_local[0],szGlobalWorkSize1_Conv2D_local[1]) label("convolutionRowGPU_local") taskid(profInfo) bind(DEVICE_CONVROW)  
-	convolutionRowGPUlocal(h_Buff,img,imageW,imageH,num_of_images);
+	convolutionRowGPUlocal(h_Buff,img,imageW,imageH,hw,l,j,im.w,num_of_images);
 	#pragma acl taskwait label("convolutionRowGPU_local")
 
-	int  smemStride = convColumnTileWidth_local * szLocalWorkSize2_Conv2D_local[1];
-	int  gmemStride = imageW * szLocalWorkSize2_Conv2D_local[1];
+
 
 	#pragma acl task buffer(h_Buff) buffer(target) workers(szLocalWorkSize2_Conv2D_local[0],szLocalWorkSize2_Conv2D_local[1]) groups(szGlobalWorkSize2_Conv2D_local[0],szGlobalWorkSize2_Conv2D_local[1]) label("convolutionColumnGPU_local") taskid(profInfo) bind(DEVICE_CONVCOL) 
-	convolutionColumnGPUlocal(target,h_Buff,imageW,imageH,smemStride,gmemStride,num_of_images);
+	convolutionColumnGPUlocal(target,h_Buff,imageW,imageH,hw,l,j,im.w,num_of_images);
 	#pragma acl taskwait label("convolutionColumnGPU_local")
 
 }
@@ -153,7 +152,7 @@ void local_Upsample(pixel_t *d_Result,pixel_t *d_Input,int y_offset,int ResultW,
 	SetupsampleSize(ResultW/2+ResultW%2,ResultH/2+ResultH%2 ,gaussianW);
 
 	#pragma acl task buffer(d_Result) buffer(d_Input) workers(szLocalWorkSize_upSample[0],szLocalWorkSize_upSample[1]) groups(szGlobalWorkSize_upSample[0],szGlobalWorkSize_upSample[1])label("Upsample_GPU") taskid(profInfo) bind(DEVICE_UPSAMPLE)
-	UpsampleGPU( d_Result,   d_Input,  y_offset,  ResultW, ResultH,  l, j, hw);
+	UpsampleGPU( d_Result,   d_Input,  y_offset,  ResultW, ResultH,im.w,  l, j, hw);
 	#pragma acl taskwait label("Upsample_GPU")
 }
 
@@ -162,7 +161,7 @@ void local_Downsample( pixel_t * target , pixel_t * temp,int imageH,int  imageW,
 	SetSubsampleSize(imageW/2+imageW%2,imageH/2+imageH%2 ,gaussianW);
 
 	#pragma acl task buffer(target) buffer(temp) workers(szLocalWorkSize_subSample[0],szLocalWorkSize_subSample[1]) groups(szGlobalWorkSize_subSample[0],szGlobalWorkSize_subSample[1]) label("downsampleGPU") taskid(profInfo) bind(DEVICE_DOWNSAMPLE)  
-	downsampleGPU(target,temp,     y_offset,      imageW,   imageH,     l, j,    hw);
+	downsampleGPU(target,temp,     y_offset,      imageW,   imageH,im.w,     l, j,    hw);
 	#pragma acl taskwait label("downsampleGPU")
 }
 
@@ -171,7 +170,7 @@ void local_sub(pixel_t *d_L,pixel_t *d_G,pixel_t *d_Result,int targetW,int targe
 	SetSubSize(targetW,targetH,gaussianW);
 	
 	#pragma acl task buffer(d_L) buffer(d_G) device_out(d_Result) workers(szLocalWorkSize_Sub[0]) groups(szGlobalWorkSize_Sub[0])label("Sub_GPU") taskid(profInfo) bind(DEVICE_SUB)
-	Sub_GPU(d_L,d_G,d_Result,l,hw,y_offset,targetW,targetH);
+	Sub_GPU(d_L,d_G,d_Result,l,hw,y_offset,im.w,targetW,targetH);
 	#pragma acl taskwait label("Sub_GPU")
 }
 void local_PyramidDown(int imageW, int imageH, pixel_t * img, pixel_t * temp,pixel_t * target,pixel_t * h_Buff,int y_offset, int l,int j, int hw,int gaussianW){
@@ -179,7 +178,7 @@ void local_PyramidDown(int imageW, int imageH, pixel_t * img, pixel_t * temp,pix
 
 	clock_gettime(CLOCK_MONOTONIC, &blur_time_start);
 
-	local_ConvBlur_GPU( imageW,  imageH, img, temp, h_Buff, gaussianW);
+	local_ConvBlur_GPU( imageW,  imageH, img, temp, h_Buff, gaussianW,hw , l,j );
 	
 	clock_gettime(CLOCK_MONOTONIC, &blur_time_finish);
   	blur_time_elapsed += (blur_time_finish.tv_sec - blur_time_start.tv_sec);
@@ -209,7 +208,7 @@ void local_PyramidUp_sub( int targetW, int targetH, pixel_t * img, pixel_t * tem
 
   	clock_gettime(CLOCK_MONOTONIC, &blur_time_start);
   	
-	local_ConvBlur_GPU( targetW,  targetH, temp, target, h_Buff, gaussianW);
+	local_ConvBlur_GPU( targetW,  targetH, temp, target, h_Buff, gaussianW,hw , l,j );
   	
   	clock_gettime(CLOCK_MONOTONIC, &blur_time_finish);
   	blur_time_elapsed += (blur_time_finish.tv_sec - blur_time_start.tv_sec);
@@ -562,45 +561,6 @@ pixel_t * R_line	= 	(pixel_t *) malloc(imLPyramid[0].w*sizeof(pixel_t));
 
 		       	int xfclev0 = hw>>l;
 
-#if 0          		
-          		row_range.start = yf-hw;
-            	row_range.end = yf+hw;
-            	
-            	col_range.start = xf-hw;
-            	col_range.end = xf+hw; 
-	    		Pyramid[0].w = col_range.end - col_range.start;
-	    		Pyramid[0].h = row_range.end - row_range.start;
-	    		Pyramid[0].img  = G_pyramid_address_space[0]+ x*(4*hw*hw);
-	    		LPyramid[0].img = (double *)malloc(Pyramid[0].h*Pyramid[0].w*sizeof(double));
-	    		for (i = 1; i < l+2; ++i)
-	    		{	       				
-	       			
-	       			Pyramid[i].h = Pyramid[i-1].h/2+Pyramid[i-1].h%2;
-	       			Pyramid[i].w = Pyramid[i-1].w/2+Pyramid[i-1].w%2;
-	       			Pyramid[i].img =  (double *)malloc(Pyramid[i].h*Pyramid[i].w*sizeof(double));
-	    			LPyramid[i].img = (double *)malloc(Pyramid[i].h*Pyramid[i].w*sizeof(double));   
-		   		}		   		
-	
-#if 0
-				double g0 = imPyramid[l].img[imPyramid[l].w*y+x];
-		        remapp(row_range , col_range,Pyramid[0].w,Pyramid[0].h, Pyramid[0].img,g0,sigma);
-#endif		        
-
-
-
-				cstart = col_range.start;
-				rstart = row_range.start;	
-		        for (j = 1; j < l+2; j++) {
-		        	int c_off=cstart%2;
-					int r_off=rstart%2;
-					cstart= cstart/2+c_off;
-					rstart= rstart/2+r_off;
-		        	PyramidDown(	Pyramid[j-1].w, Pyramid[j-1].h, Pyramid[j-1].img, imTempPyramid[j-1].img , Pyramid[j].img,c_off,r_off);
-        			PyramidUp_sub( 	Pyramid[j].w  , Pyramid[j].h  , Pyramid[j].img  , imTempPyramid[j-1].img , LPyramid[j-1].img , Pyramid[j-1].img,c_off,r_off,Pyramid[j-1].w  , Pyramid[j-1].h );
-    			}
-    			
-    			double value = LPyramid[l].img[Pyramid[l].w*yfclev0 + xfclev0];
-#endif
     			pixel_t value = R_line[x];
 		       	//pixel_t value = L_pyramid_address_space[l][Pyramid[l].w*Pyramid[l].h*x + Pyramid[l].w*yfclev0 + xfclev0];
   				imLPyramid[l].img[imLPyramid[l].w*y+x] =value;

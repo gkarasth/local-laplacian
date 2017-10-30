@@ -247,12 +247,12 @@ struct timespec time_start, time_finish;
     for (int l = 0; l < J-1; l++) {
 		int hw = 3*(1<<(l+1))-2;
 
-		Pyramid[0].w = 2*hw;
-		Pyramid[0].h = 2*hw;
-		local_LPyramid[0].h = 2*hw;
-   		local_LPyramid[0].w = 2*hw;
-   		local_GPyramid[0].h = 2*hw;
-   		local_GPyramid[0].w = 2*hw;
+		// Pyramid[0].w = 2*hw;
+		// Pyramid[0].h = 2*hw;
+		// local_LPyramid[0].h = 2*hw;
+  //  		local_LPyramid[0].w = 2*hw;
+  //  		local_GPyramid[0].h = 2*hw;
+  //  		local_GPyramid[0].w = 2*hw;
 
 		//pixel_t * ones = malloc((4*hw*hw)*sizeof(pixel_t));
 		//printf("%d vs %d  \n",Pyramid[0].w ,2*hw );
@@ -283,13 +283,34 @@ struct timespec time_start, time_finish;
             	col_range.start = max(xf-hw,0);
             	col_range.end = min(xf+hw,imGPyramid[0].w);
 				
-            	int xfc = xf-col_range.start;
+
+		   		Pyramid[0].w = col_range.end - col_range.start;
+				Pyramid[0].h = row_range.end - row_range.start;
+				local_LPyramid[0].h = Pyramid[0].h;
+		   		local_LPyramid[0].w = Pyramid[0].w;
+		   		local_GPyramid[0].h = Pyramid[0].h;
+		   		local_GPyramid[0].w = Pyramid[0].w;
+
+		   		int xfc = xf-col_range.start;
 		   		int yfc = yf-row_range.start;
 
 				int yfclev0 = yfc>>l;
 		       	int xfclev0 = xfc>>l;
-	   		
+	   			
 
+				for (i = 1; i < l+2; ++i)
+				{	       		
+
+		   			Pyramid[i].h = Pyramid[i-1].h/2+Pyramid[i-1].h%2;
+		   			Pyramid[i].w = Pyramid[i-1].w/2+Pyramid[i-1].w%2;
+		   			local_LPyramid[i].h = Pyramid[i-1].h/2+Pyramid[i-1].h%2;
+		   			local_LPyramid[i].w = Pyramid[i-1].w/2+Pyramid[i-1].w%2;
+		   			
+		   			local_GPyramid[i].h = Pyramid[i-1].h/2+Pyramid[i-1].h%2;
+		   			local_GPyramid[i].w = Pyramid[i-1].w/2+Pyramid[i-1].w%2;
+					//printf("%d %d\n", Pyramid[i].w,Pyramid[i].h);
+
+		   		}
 
 				clock_gettime(CLOCK_MONOTONIC, &remapp_time_start);
 

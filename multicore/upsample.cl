@@ -7,12 +7,22 @@ __kernel void UpsampleGPU(
     int y_offset, 
     int ResultW,
     int ResultH,
+    int ImageW,
     int l,
     int j,
     int hw
 ){
   #pragma OPENCL EXTENSION cl_khr_fp64 : enable
-  int cstart= get_group_id(0)*(1<<(l)) - hw;
+  
+  int cstart = get_group_id(0)*(1<<(l)) - hw;
+  int cend =   get_group_id(0)*(1<<(l)) + hw;
+  
+  if (cstart<0) cstart = 0;         //max
+  if (cend >ImageW) cend = ImageW;  //min 
+
+   
+  int RealInputW=cend - cstart;
+  int RealResultW = RealInputW*2 ; 
   int rstart = y_offset*(1<<(l)) -hw;
     if (rstart<0)rstart =0;
 
@@ -26,8 +36,12 @@ __kernel void UpsampleGPU(
     r_off=abs(rstart%2);
     cstart= cstart/2+c_off;
     rstart= rstart/2+r_off;
+    RealResultW = RealInputW;
+    RealInputW = RealInputW/2 + RealInputW%2;
   }
 
+// RealResultW = ResultW;
+// RealInputW  = InputW;
 
   int x = get_local_id(0);
   int y = get_group_id(1);
@@ -46,15 +60,18 @@ __kernel void UpsampleGPU(
 
   int addr3x = 2*x + 1 - c_off;
   int addr3y = 2*y + 1 - r_off; 
+  if (x<RealInputW)
+  {
 
-  if(addr0y<ResultH && addr0x<ResultW)
-    d_Result[write_offset+addr0x+addr0y*ResultW]=4.0*d_Input[read_offset+x+y*InputW];
-  if(addr1y<ResultH && addr1x<ResultW)
-    d_Result[write_offset+addr1x+addr1y*ResultW]=0;
-  if(addr2y<ResultH && addr2x<ResultW)
-    d_Result[write_offset+addr2x+addr2y*ResultW]=0;
-  if(addr3y<ResultH && addr3x<ResultW)
-    d_Result[write_offset+addr3x+addr3y*ResultW]=0;
+    if(addr0y<ResultH && addr0x<RealResultW)
+      d_Result[write_offset+addr0x+addr0y*RealResultW]=4.0*d_Input[read_offset+x+y*RealInputW];
+    if(addr1y<ResultH && addr1x<RealResultW)
+      d_Result[write_offset+addr1x+addr1y*RealResultW]=0;
+    if(addr2y<ResultH && addr2x<RealResultW)
+      d_Result[write_offset+addr2x+addr2y*RealResultW]=0;
+    if(addr3y<ResultH && addr3x<RealResultW)
+      d_Result[write_offset+addr3x+addr3y*RealResultW]=0;
+  }
 }
 
 //56381.417460

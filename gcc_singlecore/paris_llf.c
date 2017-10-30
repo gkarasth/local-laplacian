@@ -281,10 +281,12 @@ struct timespec time_start, time_finish;
 
         		
           		row_range.start = max(yf-hw,0);
-            	row_range.end = min(yf+hw+1,imGPyramid[0].h);
+            	row_range.end   = min(yf+hw,imGPyramid[0].h);
             	
             	col_range.start = max(xf-hw,0);
-            	col_range.end = min(xf+hw+1,imGPyramid[0].w);
+            	col_range.end   = min(xf+hw,imGPyramid[0].w);
+				// col_range.start = xf-hw;
+    //         	col_range.end = xf+hw;
 				
             
 	   			Pyramid[0].w = col_range.end - col_range.start;
